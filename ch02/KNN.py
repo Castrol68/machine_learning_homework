@@ -75,7 +75,6 @@ def autoNorm(dataSet): #  归一化处理
     minValues = dataSet.min(0)  # 每列最小值
     maxValues = dataSet.max(0)  # 每列最大值
     ranges = maxValues - minValues
-    normDataSet = np.zeros(np.shape(dataSet))
     m = dataSet.shape[0]
     normDataSet = dataSet - np.tile(minValues, (m, 1))  # 减去最小值
     normDataSet = normDataSet / np.tile(ranges, (m, 1))  # 除以范围，归一化
