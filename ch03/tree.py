@@ -8,6 +8,9 @@
 @algorithm：决策树算法
 """
 from math import log
+from tree_plotter import retrieve_tree
+import json
+from tree_plotter import create_plot
 
 
 def create_dataset():
@@ -18,7 +21,7 @@ def create_dataset():
         [0, 1, 'no'],
         [0, 1, 'no'],
     ]
-    labels = ['no surfacing', 'flippers']
+    labels = ['no surfacing', 'flipper']
     return dataset, labels
 
 
@@ -119,11 +122,75 @@ def create_tree(dataset, labels):  # 递归构建决策树
     return my_tree
 
 
+def classify(input_tree, feat_labels, test_vec):
+    """
+    对测试数据进行分类
+    :param input_tree: 决策树
+    :param feat_labels: 分类标签
+    :param test_vec: 测试数据
+    :return: 测试数据分类结果
+    """
+    first_str = ''
+    class_label = ''
+    for key in input_tree.keys():
+        first_str = key
+        break
+    feat_index = feat_labels.index(first_str)  # 将标签字符串的索引
+    second_dict = input_tree[first_str]
+
+    for key in second_dict.keys():
+        if test_vec[feat_index] == key:
+            if isinstance(second_dict[key], dict):
+                class_label = classify(second_dict[key], feat_labels, test_vec)
+            else:
+                class_label = second_dict[key]
+
+    return class_label
+
+
+def store_tree(input_tree, filename):
+    """
+    使用json模块存储树
+    :param input_tree:
+    :param filename:
+    :return:
+    """
+    with open(filename, 'w') as fw:
+        json.dump(input_tree, fw)
+
+
+def grab_tree(filename):
+    """
+    使用json模块读取树
+    :param filename:
+    :return:
+    """
+    with open(filename, 'r') as fr:
+        return json.load(fr)
+
+
 if __name__ == '__main__':
-    my_dataset, labels = create_dataset()
-    print(my_dataset)
-    print(calc_shannon_ent(my_dataset))
-    print(spilt_dataset(my_dataset, 0, 1))
-    print(spilt_dataset(my_dataset, 0, 0))
-    print(create_tree(my_dataset, labels))
+    # my_dataset, labels = create_dataset()
+    # my_tree = retrieve_tree(0)
+    # print(my_dataset)
+    # print(labels)
+    # print(my_tree)
+    # print(classify(my_tree, labels, [1, 0]))
+    # print(classify(my_tree, labels, [1, 1]))
+    # store_tree(my_tree, 'classerfier_storage.txt')
+    # print(grab_tree('classerfier_storage.txt'))
+    # print(calc_shannon_ent(my_dataset))
+    # print(spilt_dataset(my_dataset, 0, 1))
+    # print(spilt_dataset(my_dataset, 0, 0))
+    # print(create_tree(my_dataset, labels))
+    lenses = []
+    with open('lenses.txt', 'r') as fr:
+        for line in fr:
+            line = line.strip().split('\t')
+            lenses.append(line)
+    lenses_label = ['age', 'prescript', 'astigmatic', 'tear rate']
+    lenses_tree = create_tree(lenses, lenses_label)
+    create_plot(lenses_tree)
+
+
 
