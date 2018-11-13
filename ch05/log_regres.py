@@ -6,6 +6,13 @@
 @Created on 2018-11-13 09:49
 @Author:ChileWang
 @algorithm：Logistic回归梯度算法
+
+小结
+　　logistic回归的目的是寻找一个非线性函数sigmoid的最佳拟合参数，从而来相对准确的预测分类结果。
+为了找出最佳的函数拟合参数，最常用的优化算法为梯度上升法，当然我们为了节省计算损耗，通常选择随机梯度上升法来迭代更新拟合参数。
+并且，随机梯度上升法是一种在线学习算法，它可以在新数据到来时完成参数的更新，而不需要重新读取整个数据集来进行批处理运算。
+　　总的来说，logistic回归算法，其具有计算代价不高，易于理解和实现等优点；
+此外，logistic回归算法容易出现欠拟合，以及分类精度不太高的缺点。
 """
 from numpy import *
 import matplotlib.pyplot as plt
@@ -160,7 +167,7 @@ def promoved_sto_grad_ascent0(data_mat, class_labels, num_iter=150):
     for j in range(num_iter):
         data_index = list(range(m))
         for i in range(m):
-            alpha = 4 / (1.0 + j + i) + 0.001  # 保证alpha每次迭代进行调整， 避免数据波动或者高频波动
+            alpha = 4 / (1.0 + j + i) + 0.01  # 保证alpha每次迭代进行调整， 避免数据波动或者高频波动
             ran_index = int(random.uniform(0, len(data_index)))  # 随机选取样本进行更新回归系数，减少周期性波动
             h = sigmoid(sum(data_mat[ran_index] * weights))  # 点乘
             error = class_labels[ran_index] - h
