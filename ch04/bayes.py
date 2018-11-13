@@ -85,8 +85,10 @@ def train_nbc(train_mat, train_category):
 
 
 def classify_nb(vec2classify, p0_vec, p1_vec, p_class1):
-    p1 = sum(vec2classify * p1_vec) + log(p_class1)
-    p0 = sum(vec2classify * p0_vec) + log(1.0 - p_class1)
+    p1 = sum(vec2classify * p1_vec) + log(p_class1) # 分子
+    print(vec2classify)
+    print(p1_vec)
+    p0 = sum(vec2classify * p0_vec) + log(1.0 - p_class1) # 分子
     if p1 > p0:
         return 1
     else:
@@ -115,10 +117,6 @@ def text_parse(big_str):
     :param big_str:
     :return:
     """
-    # spilt_str = ''
-    # for sub_str in big_str:
-    #     spilt_str += sub_str
-
     list_of_token = re.split(r'\W', big_str)
     return [tok.lower() for tok in list_of_token if len(tok) > 2]
 
@@ -236,11 +234,11 @@ def local_words(feed1, feed0):
     return float(error_count) / len(test_set)
 
 
-
 if __name__ == '__main__':
     # aver_error_rate = 0.0
     # for i in range(20):
     #     aver_error_rate += spam_text()
     # print('the eror rate is ', aver_error_rate/20.0)
+    testing_nb()
 
 
