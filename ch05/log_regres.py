@@ -13,39 +13,65 @@ import random
 
 
 def load_dataset():
+    """
+    　假设有100个样本点，每个样本有两个特征：x1和x2.此外为方便考虑，
+    我们额外添加一个x0=1，将线性函数z=(wT)x+b转为z=(wT)x(此时向量w和x的维度均价1).
+    可以理解为x0相当于 b
+
+    那么梯度上升法的伪代码如下：
+
+　　初始化每个回归系数为1
+　　重复R次：
+　　　　计算整个数据集梯度
+　　　　使用alpha*gradient更新回归系数的向量
+　　返回回归系数
+    :return:
+    """
     data_mat = []
     label_mat = []
     with open('testSet.txt', 'r') as fr:
         for line in fr:
             line_arr = line.strip().split()
-            data_mat.append([1.0, float(line_arr[0]), float(line_arr[1])])  # 回归系数，坐标（x，y）
+            data_mat.append([1.0, float(line_arr[0]), float(line_arr[1])])  # 坐标（x，y），b=1.0
             label_mat.append(int(line_arr[2]))  # 分类标签
 
     return data_mat, label_mat
 
 
 def sigmoid(inx):
+    """
+    :param inx:输入坐标（b, x1, y1)
+    :return: sigmod函数
+    """
     return 1.0 / (1 + exp(-inx))
 
 
 def grad_ascent(data_mat, label_mat):
     """
     梯度上升算法
-    :param data_mat:
-    :param label_mat:
-    :return:
+    :param data_mat:数据集
+    :param label_mat:数据集对应的标签
+    :return:回归系数
     """
     data_mat = mat(data_mat)  # 转换成矩阵
     label_mat = mat(label_mat).transpose()  # 转置
     # print(data_mat, label_mat)
     m, n = shape(data_mat)
-    alpha = 0.001
+    alpha = 0.001  # 移动步长
     max_cycle = 500  # 最大循环次数
-    weights = ones((n, 1))  # 生成n行一列的矩阵
+    weights = ones((n, 1))  # 初始化回归系数，生成n行一列的矩阵
     # print(weights)
     for k in range(max_cycle):
-        h = sigmoid(data_mat * weights)
+        h = sigmoid(data_mat * weights)  # 计算误差
+        print(h)
         error = label_mat - h
+        print(error)
+        """
+        回归系数进行更新的公式为：w：w+alpha*gradient,其中gradient是对参数w求偏导数。
+        则我们可以通过求导验证logistic回归函数对参数w的梯度为(yi-sigmoid(wTx))*x
+        sigmoid(wT)x = h
+        yi - h = error
+        """
         weights = weights + alpha * data_mat.transpose() * error
     return weights
 
@@ -64,7 +90,7 @@ def plot_best_fit(weights):
     y_cord2 = []
     for i in range(n):
         if int(label_mat[i]) == 1:
-            x_cord1.append(data_arr[i, 1])
+            x_cord1.append(data_arr[i, 1])  # 坐标（x,y)
             y_cord1.append(data_arr[i, 2])
         else:
             x_cord2.append(data_arr[i, 1])
@@ -75,6 +101,11 @@ def plot_best_fit(weights):
     ax.scatter(x_cord1, y_cord1, s=30, c='red', marker='s')
     ax.scatter(x_cord2, y_cord2, s=30, c='green')
     x = array(arange(-3.0, 3.0, 1.0))  # 取六个点，步长为1
+    """
+    x = 0是（两个类别）sigmoid函数的分界线
+    我们设定 0 = w0x0 + w1x1 + w2x2 此时x0 = 1
+    y = x2 = -(w0 + w1x1)/w2
+    """
     y = (-weights[0] - weights[1] * x) / weights[2]
     y = array(y)  # 随机梯度算法用的y
     # y = array(y)[0] # 梯度上升算法用的y
@@ -89,15 +120,28 @@ def plot_best_fit(weights):
 def sto_grad_ascent0(data_mat, class_labels):
     """
     随机梯度上升算法
+我们知道梯度上升法每次更新回归系数都需要遍历整个数据集，当样本数量较小时，该方法尚可，
+但是当样本数据集非常大且特征非常多时，那么随机梯度下降法的计算复杂度就会特别高。
+一种改进的方法是一次仅用一个样本点来更新回归系数，即随机梯度上升法。
+由于可以在新样本到来时对分类器进行增量式更新，因此随机梯度上升法是一个在线学习算法。
+
+随机梯度上升法可以写成如下伪代码：
+
+所有回归系数初始化为1
+对数据集每个样本
+　　计算该样本的梯度
+　　使用alpha*gradient更新回顾系数值
+ 返回回归系数值
+
     :param data_mat:
     :param class_labels:
     :return:
     """
     m, n = shape(data_mat)
-    alpha = 0.01
-    weights = ones(n)
+    alpha = 0.01  # 步长
+    weights = ones(n)  # 回归系数
     for i in range(m):
-        h = sigmoid(sum(data_mat[i] * weights))  # 点乘
+        h = sigmoid(sum(data_mat[i] * weights))  # 点乘即对应相乘
         error = class_labels[i] - h
         weights = weights + alpha * error * data_mat[i]
     return weights
@@ -106,18 +150,18 @@ def sto_grad_ascent0(data_mat, class_labels):
 def promoved_sto_grad_ascent0(data_mat, class_labels, num_iter=150):
     """
     改进的随机梯度上升算法
-    :param data_mat:
-    :param class_labels:
-    :param num_iter:
-    :return:
+    :param data_mat:数据集
+    :param class_labels:数据集对应的标签
+    :param num_iter:迭代次数， 默认150
+    :return:回归系数
     """
     m, n = shape(data_mat)
     weights = ones(n)
     for j in range(num_iter):
         data_index = list(range(m))
         for i in range(m):
-            alpha = 4 / (1.0 + j + i) + 0.01
-            ran_index = int(random.uniform(0, len(data_index)))
+            alpha = 4 / (1.0 + j + i) + 0.001  # 保证alpha每次迭代进行调整， 避免数据波动或者高频波动
+            ran_index = int(random.uniform(0, len(data_index)))  # 随机选取样本进行更新回归系数，减少周期性波动
             h = sigmoid(sum(data_mat[ran_index] * weights))  # 点乘
             error = class_labels[ran_index] - h
             weights = weights + alpha * error * data_mat[ran_index]
@@ -127,6 +171,11 @@ def promoved_sto_grad_ascent0(data_mat, class_labels, num_iter=150):
 
 
 def classify_vector(inx, weights):
+    """
+    :param inx: 输入
+    :param weights: 回归系数
+    :return: 返回类别
+    """
     prob = sigmoid(sum(inx * weights))
     if prob > 0.5:
         return 1.0
@@ -145,7 +194,7 @@ def colic_test():
                 line_arr.append(float(curr_line[i]))
             training_set.append(line_arr)
             training_label.append(float(curr_line[21]))
-    training_wei = promoved_sto_grad_ascent0(array(training_set), training_label, 500)
+    training_wei = promoved_sto_grad_ascent0(array(training_set), training_label, 500)  # 回归系数
 
     # 测试
     error_count = 0
@@ -173,7 +222,7 @@ def multi_test():   # 多次测试求平均值
 
 
 if __name__ == '__main__':
-    data_mat, label_mat = load_dataset()
+    # data_mat, label_mat = load_dataset()
     # print(data_mat, label_mat)
     # weights = grad_ascent(data_mat, label_mat)
     # print(weights)
