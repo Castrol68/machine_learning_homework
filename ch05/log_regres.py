@@ -70,9 +70,7 @@ def grad_ascent(data_mat, label_mat):
     # print(weights)
     for k in range(max_cycle):
         h = sigmoid(data_mat * weights)  # 计算误差
-        print(h)
         error = label_mat - h
-        print(error)
         """
         回归系数进行更新的公式为：w：w+alpha*gradient,其中gradient是对参数w求偏导数。
         则我们可以通过求导验证logistic回归函数对参数w的梯度为(yi-sigmoid(wTx))*x
@@ -80,6 +78,7 @@ def grad_ascent(data_mat, label_mat):
         yi - h = error
         """
         weights = weights + alpha * data_mat.transpose() * error
+
     return weights
 
 
@@ -115,9 +114,12 @@ def plot_best_fit(weights):
     """
     y = (-weights[0] - weights[1] * x) / weights[2]
     y = array(y)  # 随机梯度算法用的y
-    # y = array(y)[0] # 梯度上升算法用的y
+    # y = array(y)[0]  # 梯度上升算法用的y[0]
     # print(x)
     # print(y)
+    print('b:', -weights[0]/weights[2])
+    print('k:', -weights[1] / weights[2])
+    print('k:', (y[0] - y[1])/(x[0] - x[1]))
     ax.plot(x, y)
     plt.xlabel('X1')
     plt.ylabel('Y1')
@@ -150,7 +152,11 @@ def sto_grad_ascent0(data_mat, class_labels):
     for i in range(m):
         h = sigmoid(sum(data_mat[i] * weights))  # 点乘即对应相乘
         error = class_labels[i] - h
+        # print(class_labels[i])
+        # print(error)
         weights = weights + alpha * error * data_mat[i]
+        # print(weights)
+        # print('---------------')
     return weights
 
 
@@ -172,6 +178,9 @@ def promoved_sto_grad_ascent0(data_mat, class_labels, num_iter=150):
             h = sigmoid(sum(data_mat[ran_index] * weights))  # 点乘
             error = class_labels[ran_index] - h
             weights = weights + alpha * error * data_mat[ran_index]
+            # print(error)
+            # print(weights)
+            # print('------------')
             del(data_index[ran_index])
 
     return weights
@@ -229,13 +238,14 @@ def multi_test():   # 多次测试求平均值
 
 
 if __name__ == '__main__':
-    # data_mat, label_mat = load_dataset()
+    data_mat, label_mat = load_dataset()
     # print(data_mat, label_mat)
-    # weights = grad_ascent(data_mat, label_mat)
+    weights = grad_ascent(data_mat, label_mat)
     # print(weights)
     # weights = sto_grad_ascent0(array(data_mat), label_mat)  # 都是array数组
     # weights = promoved_sto_grad_ascent0(array(data_mat), label_mat)  # 都是array数组
     # print(weights)
-    # plot_best_fit(weights)
-    multi_test()
+    print(weights)
+    plot_best_fit(weights)
+    # multi_test()
 
