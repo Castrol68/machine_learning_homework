@@ -9,6 +9,7 @@
 """
 from numpy import *
 from sklearn.svm import SVC
+import os
 
 
 def load_dataset(filename):
@@ -121,7 +122,7 @@ def smo_simple(data_mat_in, class_labels, c, toler, max_iter):
 
 
 class opt_struct():
-    def __init__(self, data_mat_in, class_labels, c, toler):
+    def __init__(self, data_mat_in, class_labels, c, toler, kTup):
         """
         :param data_mat_in: 数据集
         :param class_labels: 分类标签
@@ -136,6 +137,9 @@ class opt_struct():
         self.alphas = mat(zeros((self.m, 1)))
         self.b = 0
         self.e_cache = mat(zeros((self.m, 2)))  # 误差缓存 第一列为是否有效标志位， 第二列是实际的e值
+        self.K = mat(zeros((self.m, self.m)))
+        for i in range(self.m):  # 对矩阵每个元素计算高斯函数
+            self.K[:, i] = kernel_trans(self.X, self.X[i, :], kTup)
 
 
 def calc_ek(os, k):
@@ -145,7 +149,7 @@ def calc_ek(os, k):
     :param k:
     :return:计算预测值与真实值的误差
     """
-    fxk = float(multiply(os.alphas, os.labels).T * (os.X * os.X[k, :].T)) + os.b
+    fxk = float(multiply(os.alphas, os.labels).T * os.K[:, k] + os.b)
     ek = fxk - float(os.labels[k])
     return ek
 
@@ -200,7 +204,7 @@ def inner_loop(i, os):
     """
     ei = calc_ek(os, i)
     if (os.labels[i] * ei < -os.tol and os.alphas[i] < os.c) or \
-        (os.labels[i] * ei > os.tol and os.alphas[i] > 0): # 找到违反kkt条件最严重的点
+            (os.labels[i] * ei > os.tol and os.alphas[i] > 0):  # 找到违反kkt条件最严重的点
         j, ej = select_J(i, os, ei)
         alphaI_old = os.alphas[i].copy()  # αi_old
         alphaJ_old = os.alphas[j].copy()  # αj_old
@@ -215,26 +219,32 @@ def inner_loop(i, os):
         if L == H:
             print('L==H')
             return 0
-        eta = 2.0 * os.X[i, :] * os.X[j, :].T - os.X[i, :] * os.X[i, :].T - os.X[j, :] * os.X[j, :].T
+        # eta = 2.0 * os.X[i, :] * os.X[j, :].T - os.X[i, :] * os.X[i, :].T - os.X[j, :] * os.X[j, :].T
+        eta = 2.0 * os.K[i, j] - os.K[i, i] - os.K[j, j]
         # ETA = -(xi^2 + xj ^2 - 2xixj)
         if eta >= 0:
-            print('eta >= 0')
+            # print('eta >= 0')
             return 0
         os.alphas[j] -= os.labels[j] * (ei - ej) / eta
         os.alphas[j] = clip_alpha(os.alphas[j], H, L)  # 算出αj
         update_ek(os, j)  # 更新误差缓存
-        if os.alphas[j] - alphaJ_old < 0.00001:
-            print('j not moving enough!')
+        if abs(os.alphas[j] - alphaJ_old) < 0.00001:
+            # print('j not moving enough!')
             return 0
         os.alphas[i] += os.labels[j] * os.labels[i] * (alphaJ_old - os.alphas[j])   # 算出αi
         update_ek(os, i)  # 更新误差缓存
 
         # 算b1, b2 并且保证b1, b1 均大于零小于C, 否则b = (b1 + b2) / 2
-        b1 = os.b - ei - os.labels[i] * (os.alphas[i] - alphaI_old) * os.X[i, :] * os.X[i, :].T - os.labels[j] * \
-             (os.alphas[j] - alphaJ_old) * os.X[i, :] * os.X[j, :].T
+        # b1 = os.b - ei - os.labels[i] * (os.alphas[i] - alphaI_old) * os.X[i, :] * os.X[i, :].T - os.labels[j] * \
+        #      (os.alphas[j] - alphaJ_old) * os.X[i, :] * os.X[j, :].T
 
-        b2 = os.b - ej - os.labels[i] * (os.alphas[i] - alphaI_old) * os.X[j, :] * os.X[i, :].T - os.labels[j] * \
-             (os.alphas[j] - alphaJ_old) * os.X[j, :] * os.X[j, :].T
+        b1 = os.b - ei - os.labels[i] * (os.alphas[i] - alphaI_old) * os.K[i, i] - os.labels[j] * \
+             (os.alphas[j] - alphaJ_old) * os.K[i, j]
+
+        # b2 = os.b - ej - os.labels[i] * (os.alphas[i] - alphaI_old) * os.X[j, :] * os.X[i, :].T - os.labels[j] * \
+        #      (os.alphas[j] - alphaJ_old) * os.X[j, :] * os.X[j, :].T
+        b2 = os.b - ej - os.labels[i] * (os.alphas[i] - alphaI_old) * os.K[i, j] - os.labels[j] * \
+             (os.alphas[j] - alphaJ_old) * os.K[j, j]
 
         if (0 < os.alphas[i]) and (os.c > os.alphas[i]):
             os.b = b1
@@ -247,8 +257,8 @@ def inner_loop(i, os):
         return 0
 
 
-def smo_P(data_mat_in, class_labels, c, toler, max_iter, kTup = ('lin', 0)):
-    os = opt_struct(mat(data_mat_in), mat(class_labels).transpose(), c, toler)
+def smo_P(data_mat_in, class_labels, c, toler, max_iter, kTup=('lin', 0)):
+    os = opt_struct(mat(data_mat_in), mat(class_labels).transpose(), c, toler, kTup)
     iter = 0
     entre_set = True
     alpha_pairs_changed = 0
@@ -259,19 +269,19 @@ def smo_P(data_mat_in, class_labels, c, toler, max_iter, kTup = ('lin', 0)):
         if entre_set:  # 遍历所有值  遍历任意可能的α
             for i in range(os.m):
                 alpha_pairs_changed += inner_loop(i, os)
-                print('fullset, iter: %d i:%d ,paris changed:%d' % (iter, i, alpha_pairs_changed))
+                # print('fullset, iter: %d i:%d ,paris changed:%d' % (iter, i, alpha_pairs_changed))
             iter += 1
         else:  # 检查非边界值 遍历不在边界的α
-            non_boundIs = nonzero((os.alphas.A > 0) * (os.alphas.A < os.c))[0]
+            non_boundIs = nonzero((os.alphas.A > 0) * (os.alphas.A < c))[0]
             for i in non_boundIs:
                 alpha_pairs_changed += inner_loop(i, os)
-                print('non-bound, iter: %d i:%d ,paris changed:%d' % (iter, i, alpha_pairs_changed))
+                # print('non-bound, iter: %d i:%d ,paris changed:%d' % (iter, i, alpha_pairs_changed))
             iter += 1
         if entre_set:
             entre_set = False
         elif alpha_pairs_changed == 0:
             entre_set = True
-        print("iteration number: %d" % iter)
+        # print("iteration number: %d" % iter)
     return os.b, os.alphas
 
 
@@ -285,16 +295,170 @@ def calc_ws(alphas, data_arr, class_labels):
     return w
 
 
-if __name__ == '__main__':
-    data_arr, labels = load_dataset('testSet.txt')
-    b, alphas = smo_P(data_arr, labels, 0.6, 0.001, 40)
-    ws = calc_ws(alphas, data_arr, labels)
-    # print(ws)
+def kernel_trans(X, A, kTup):
+    """
+    核转化
+    :param X:
+    :param A:
+    :param kTup:
+    :return:
+    """
+    m, n = shape(X)
+    K = mat(zeros((m, 1)))
+    if kTup[0] == 'lin':
+        K = X * A.T
+    elif kTup[0] == 'rbf':
+        for j in range(m):
+            delta_row = X[j, :] - A
+            K[j] = delta_row * delta_row.T
+        K = exp(K / (-1 * kTup[1] ** 2))
+    else:
+        raise NameError('Kernel is not recognized!')
+    return K
+
+
+def calc_error_rate(data_arr, labels, ws, b):
+    """
+    预测错误率
+    :param data_arr: 测试集
+    :param class_labels:测试标签
+    :return:
+    """
     data_mat = mat(data_arr)
-    print(data_mat[0])
-    print(labels[0])
-    print(data_mat[0] * mat(ws) + b)
-    print('-------------------')
-    clf = SVC()
-    clf.fit(data_arr, labels)
-    print(clf.predict(data_mat[0]))
+    error_count = 0
+    m = shape(data_mat)[0]
+    for i in range(m):
+        res = data_mat[i] * mat(ws) + b
+        if abs(res + labels[i]) != abs(res) + abs(labels[i]):  # 异号，预测错误
+            error_count += 1
+    print(float(error_count) / float(m))
+    return float(error_count) / float(m)
+
+
+def test_rbf(k1=1.3):
+    """
+    测试使用核函数
+    :param k1:
+    :return:
+    """
+    data_arr, labels = load_dataset('testSetRBF.txt')
+    b, alphas = smo_P(data_arr, labels, 200, 0.0001, 100000, ('rbf', k1))
+    data_mat = mat(data_arr)
+    label_mat = mat(labels).transpose()
+    svInd = nonzero(alphas.A > 0)[0]  # 支持向量的索引
+    # 构建支持向量矩阵
+    sVs = data_mat[svInd]
+    labelSV = label_mat[svInd]
+    print('That are %d support vectors' % shape(sVs)[0])
+    m, n = shape(data_mat)
+    error_count = 0
+    for i in range(m):
+        kernel_eval = kernel_trans(sVs, data_mat[i, :], ('rbf', k1))
+        predict = kernel_eval.T * multiply(labelSV, alphas[svInd]) + b
+        if sign(predict) != sign(labels[i]):
+            error_count += 1
+
+    print('the training error_rate is %f' % (float(error_count) / float(m)))
+
+    print('---------------------------------------')
+    data_arr, labels = load_dataset('testSetRBF2.txt')
+    error_count = 0
+    data_mat = mat(data_arr)
+    label_mat = mat(labels).transpose()
+    m, n = shape(data_mat)
+    for i in range(m):
+        kernel_eval = kernel_trans(sVs, data_mat[i, :], ('rbf', k1))
+        predict = kernel_eval.T * multiply(labelSV, alphas[svInd]) + b
+        if sign(predict) != sign(labels[i]):
+            error_count += 1
+    print('the training error_rate is %f' % (float(error_count) / float(m)))
+
+
+def img2vetor(filename):
+    vetor = []
+    with open(filename, 'r') as fr:
+        for line in fr:
+            line = line.rstrip()
+            for int_line in line:
+                vetor.append(int(int_line))
+    vetor = array(vetor)
+    return vetor
+
+
+def load_images(dirname):
+    hwl_labels = []
+    training_file_list = os.listdir(dirname)
+    m = len(training_file_list)
+    training_mat = zeros((m, 1024))
+    for i in range(m):
+        file_name_str = training_file_list[i]
+        file_str = file_name_str.split('.')[0]
+        class_num_str = int(file_str.split('_')[0])  # 分类标签
+        if class_num_str == 9:
+            hwl_labels.append(-1)
+        else:
+            hwl_labels.append(1)
+        training_mat[i, :] = img2vetor('%s%s' % (dirname, file_name_str))
+    return training_mat, hwl_labels
+
+
+def test_digits(kTup=('rbf', 10)):
+    """
+    数字分类（分类1和9）
+    :param kTup:
+    :return:
+    """
+    data_arr, labels = load_images('trainingDigits/')
+    b, alphas = smo_P(data_arr, labels, 200, 0.0001, 10000, kTup)
+    # b, alphas = smo_P(data_arr, labels, 10, 0.001, 10000, ('lin', 0))
+    data_mat = mat(data_arr)
+    label_mat = mat(labels).transpose()
+    svInd = nonzero(alphas.A > 0)[0]  # 支持向量的索引
+    # 构建支持向量矩阵
+    sVs = data_mat[svInd]
+    labelSV = label_mat[svInd]
+    print('That are %d support vectors' % shape(sVs)[0])
+    m, n = shape(data_mat)
+    error_count = 0
+    for i in range(m):
+        kernel_eval = kernel_trans(sVs, data_mat[i, :], kTup)
+        predict = kernel_eval.T * multiply(labelSV, alphas[svInd]) + b
+        if sign(predict) != sign(labels[i]):
+            error_count += 1
+
+    print('the training error_rate is %f' % (float(error_count) / float(m)))
+
+    data_arr, labels = load_images('testDigits/')
+    error_count = 0
+    data_mat = mat(data_arr)
+    label_mat = mat(labels).transpose()
+    m, n = shape(data_mat)
+    for i in range(m):
+        kernel_eval = kernel_trans(sVs, data_mat[i, :], kTup)
+        predict = kernel_eval.T * multiply(labelSV, alphas[svInd]) + b  # 预测
+        if sign(predict) != sign(labels[i]):
+            error_count += 1
+    print('the test error_rate is %f' % (float(error_count) / float(m)))
+
+
+if __name__ == '__main__':
+    # data_arr, labels = load_dataset('testSet.txt')
+    # b, alphas = smo_P(data_arr, labels, 0.6, 0.001, 40, ('lin', 0))
+    # ws = calc_ws(alphas, data_arr, labels)
+    # calc_error_rate(data_arr, labels, ws, b)
+    # test_rbf()
+    print('--------------------')
+    test_digits(kTup=('rbf', 0.1))
+    test_digits(kTup=('rbf', 5))
+    test_digits(kTup=('rbf', 10))
+    test_digits(kTup=('rbf', 50))
+    test_digits(kTup=('rbf', 100))
+
+
+    # print(data_mat[0])
+    # print(labels[0])
+    # print(data_mat[0] * mat(ws) + b)
+    # print('-------------------')
+    # clf = SVC()
+    # clf.fit(data_arr, labels)
+    # print(clf.predict(data_mat[0]))
