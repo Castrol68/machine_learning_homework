@@ -217,7 +217,7 @@ def inner_loop(i, os):
             H = min(os.c, os.alphas[j] + os.alphas[i])
 
         if L == H:
-            print('L==H')
+            # print('L==H')
             return 0
         # eta = 2.0 * os.X[i, :] * os.X[j, :].T - os.X[i, :] * os.X[i, :].T - os.X[j, :] * os.X[j, :].T
         eta = 2.0 * os.K[i, j] - os.K[i, i] - os.K[j, j]
@@ -271,7 +271,7 @@ def smo_P(data_mat_in, class_labels, c, toler, max_iter, kTup=('lin', 0)):
                 alpha_pairs_changed += inner_loop(i, os)
                 # print('fullset, iter: %d i:%d ,paris changed:%d' % (iter, i, alpha_pairs_changed))
             iter += 1
-        else:  # 检查非边界值 遍历不在边界的α
+        else:  # 检查非边界值 遍历在边界的α
             non_boundIs = nonzero((os.alphas.A > 0) * (os.alphas.A < c))[0]
             for i in non_boundIs:
                 alpha_pairs_changed += inner_loop(i, os)
