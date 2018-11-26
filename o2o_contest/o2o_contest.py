@@ -19,6 +19,7 @@ from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, auc, roc_curve
 from sklearn.preprocessing import MinMaxScaler
+from sklearn import svm
 
 
 pd.set_option('display.max_columns', None)  # 显示所有列
@@ -148,7 +149,7 @@ def check_model(data, preditors):
     模型预测
     :param data: 数据集合
     :param preditors: 特征
-    :return:拟合的模型
+    :return:拟合的SDG模型
     """
     classifier = lambda: SGDClassifier(
         loss='log',  # loss funtion:logistic regression
@@ -177,14 +178,49 @@ def check_model(data, preditors):
     folder = StratifiedKFold(n_splits=3, shuffle=True)
     # Exhaustive search over specified parameter values for an estimator.
     grid_search = GridSearchCV(
-        model,
+        model,  # estimator：使用的模型
         parameters,
-        cv=folder,
+        cv=folder,  # cv：交叉验证参数，默认为3，使用3折交叉验证
         n_jobs=-1,  # -1 means using all processors
-        verbose=1)
+        verbose=1)  # verbose：日志冗长度，int：冗长度，0：不输出训练过程，1：偶尔输出，>1：对每个子模型都输出。
     grid_search = grid_search.fit(data[preditors],
                                   data['label'])
     return grid_search
+
+
+def checke_svm_model(dataset, preditors):
+    """
+    模型预测
+    :param dataset: 数据集合
+    :param preditors: 特征
+    :return:拟合的SVM模型
+    """
+
+    parameters = [{'en__C': [1, 3, 5, 7, 9, 11, 13, 15, 17, 19],  # 惩罚因子
+                   'en__gamma': [0.00001, 0.0001, 0.001, 0.1, 1, 10, 100, 1000],
+                   # rbf自带参数，与C一样，越大支持向量越多，使得高斯分布又高又瘦，造成模型只能作用于支持向量附近，也就是容易过拟合
+                   'en__kernel': ['rbf']},
+                  {'en__C': [1, 3, 5, 7, 9, 11, 13, 15, 17, 19], 'en__kernel': ['linear']}]  # 要改成en__+变量，规定的。
+
+    svr = svm.SVC()
+    model = Pipeline(steps=[
+        ('ss', StandardScaler()),
+        # transformer  # SGDClassifier对于特征的幅度非常敏感，也就是说，
+        # 我们在把数据灌给它之前，应该先对特征做幅度调整，
+        # 当然，用sklearn的StandardScaler可以很方便地完成这一点
+        ('en', svr)  # estimator
+    ])
+    clf = GridSearchCV(model, parameters, n_jobs=-1, verbose=1)
+    clf.fit(dataset[preditors], dataset['label'])
+    best_model = clf.best_estimator_
+    """
+    clf = GridSearchCV(svc, parameters, cv=5, n_jobs=8) 
+    clf.fit(train_data, train_data_tag) 
+    print(clf.best_params_) 
+    best_model = clf.best_estimator_ 
+    best_model.predict(test_data)
+    """
+    return best_model
 
 
 def save_model(model):
@@ -231,7 +267,7 @@ def main():
     print('消费日期从', date_buy[0], '到', date_buy[-1])
 
     dfoff['label'] = dfoff.apply(label, axis=1)  # 给训练集上标签
-    print(dfoff['label'].value_counts())
+    # print(dfoff['label'].value_counts())
 
     df_off, original_feature = process_data(dfoff)  # 将训练集的特征转化成统一的数值特征
     df_test, original_feature = process_data(dftest)  # 将测试集的特征转化成统一的数值特征
@@ -244,17 +280,23 @@ def main():
 
     # 训练
     # model = check_model(train_set, predictors)
-    model = get_model()
-
+    # model = get_model()
+    model = checke_svm_model(train_set, predictors)
+    print('Train is done!')
     # 验证
     y_valid_pred = model.predict_proba(valid_set[predictors])
+    # predict_proba返回的是一个 n 行 k 列的数组，
+    # 第 i 行 第 j 列上的数值是模型预测 第 i 个预测样本为某个标签的概率，并且每一行的概率和为1。
+    y_label = model.predict(valid_set[predictors])
+    print(y_valid_pred)
+    print(y_label)
     valid_set_1 = valid_set.copy()
     valid_set_1['pred_prob'] = y_valid_pred[:, 1]
-
+    # valid_set_1['y_label'] = y_label[:, 1]
+    # print(valid_set_1['y_label'].unique())
+    # print(valid_set_1[valid_set_1['pred_prob'] <= 0.5].shape[0])
     # 计算AUC
-    # vg = valid_set_1.groupby(['Coupon_id'])  # 0.53
-    # vg = valid_set_1.groupby(['User_id'])  # 0.57
-    vg = valid_set_1.groupby(['Merchant_id'])
+    vg = valid_set_1.groupby(['Coupon_id'])  # 0.53
     aucs = []
     for i in vg:
         tmpdf = i[1]
@@ -269,8 +311,8 @@ def main():
     dftest1 = df_test[['User_id', 'Coupon_id', 'Date_received']].copy()
     dftest1['Probability'] = y_test_pred[:, 1]
     dftest1.to_csv('submit1.csv', index=False, header=False)
-    print(dftest1.head(5))
-
+    print(dftest1[dftest1['Probability'] > 0.5].shape[0])
+    print(dftest1[dftest1['Probability'] <= 0.5].shape[0])
     # 保存模型
     save_model(model)
 
