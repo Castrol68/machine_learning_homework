@@ -9,6 +9,8 @@
 """
 from numpy import *
 import matplotlib.pyplot as plt
+import turtle
+import random
 
 
 def load_simple_data():
@@ -44,7 +46,7 @@ def bulid_stump(data_arr, class_label, D):
     :param data_arr:
     :param class_label:
     :param D:
-    :return:
+    :return:最佳单层决策树
     """
     data_mat = mat(data_arr)
     label_mat = mat(class_label).T
@@ -59,20 +61,25 @@ def bulid_stump(data_arr, class_label, D):
         step_size = (rabge_max - range_min) / num_steps
         for j in range(-1, int(num_steps) + 1):  # 遍历每个步长
             for inequal in ['lt', 'gt']:  # 遍历每个不等号
-                thresh_val = (range_min + float(j) * step_size)
-                predict_val = stump_classify(data_mat, i, thresh_val, inequal)
-                err_arr = mat(ones((m, 1)))
-                err_arr[predict_val == label_mat] = 0
-                weighted_error = D.T * err_arr
-                print('split: dim %d, thresh %.2f, thresh inequal: %s, the weighted error is %.3f'
-                      % (i, thresh_val, inequal, weighted_error)
-                      )
-                if weighted_error < min_err:
+                thresh_val = (range_min + float(j) * step_size)  # 取阈值
+                predict_val = stump_classify(data_mat, i, thresh_val, inequal)  # 利用阈值进行分类
+                err_arr = mat(ones((m, 1)))  # 初始错误率
+                err_arr[predict_val == label_mat] = 0  # 预测正确将其归零
+                weighted_error = D.T * err_arr  # 权值误差
+                # print('split: dim %d, thresh %.2f, thresh inequal: %s, the weighted error is %.3f'
+                #       % (i, thresh_val, inequal, weighted_error)
+                #       )
+                if weighted_error < min_err:  # 找到最小错误率
                     min_err = weighted_error
-                    best_clas_est = predict_val.copy()
+                    best_clas_est = predict_val.copy()  # 最佳分类
+                    # 最佳单层决策树
                     best_stump['dim'] = i
                     best_stump['thresh'] = thresh_val
                     best_stump['ineq'] = inequal
+                    print('split: dim %d, thresh %.2f, thresh inequal: %s, the weighted error is %.3f'
+                          % (i, thresh_val, inequal, weighted_error)
+                          )
+                    print('-------------------------')
     return best_stump, min_err, best_clas_est
 
 
@@ -93,12 +100,12 @@ def adaboost_train(data_arr, class_labels, num_it=40):
         print('D:', D.T)
         alpha = float(0.5 * log((1.0 - error) / max(error, 1e-16)))
         best_stump['alpha'] = alpha
-        weak_class_arr.append(best_stump)
+        weak_class_arr.append(best_stump)  # 最佳单层决策树保存
         print('class_est:', class_est.T)
         expon = multiply(-1 * alpha * mat(class_labels).T, class_est)
         D = multiply(D, exp(expon))
-        D = D / D.sum()
-        agg_class_est += alpha * class_est
+        D = D / D.sum()  # 更新训练集权值
+        agg_class_est += alpha * class_est  # 基本分类器的线性组合
         print('aggClassEst:', agg_class_est.T)
         agg_errors = multiply(sign(agg_class_est) != mat(class_labels).T, ones((m, 1)))
         error_rate = agg_errors.sum() / m
@@ -120,9 +127,12 @@ def ada_classifier(data2class, classifier_arr):
     agg_class_est = mat(zeros((m, 1)))
     for i in range(len(classifier_arr)):
         class_est = stump_classify(data_mat, classifier_arr[i]['dim'], classifier_arr[i]['thresh'],
-                                   classifier_arr[i]['ineq'])
-        agg_class_est += classifier_arr[i]['alpha'] * class_est
-        print(agg_class_est)
+                                   classifier_arr[i]['ineq'])  # 利用训练好的模型，预测最佳分类
+        agg_class_est += classifier_arr[i]['alpha'] * class_est  # 利用线性组合计算最终聚合分类
+    print('--------------')
+    print(agg_class_est)
+    print(sign(agg_class_est))
+    print(shape(agg_class_est)[0])
     return sign(agg_class_est)
 
 
@@ -176,15 +186,37 @@ def plot_ROC(pred_strength, class_labels):
     print("the Area Under the Curve is: ", y_sum * x_step)
 
 
+def plot_red_circle():
+    turtle.speed(0)
+    turtle.hideturtle()
+    turtle.bgcolor('black')
+    i = 1
+    color = ['red', 'purple', 'blue', 'white', 'green', 'pink', 'yellow', 'orange']
+    while i:
+        if i > 150:
+            turtle.pencolor('orange')
+        else:
+            turtle.pencolor(random.randint(0, 1), random.randint(0, 1), random.randint(0, 1))
+
+        turtle.penup()
+        turtle.goto(0, 0)
+        turtle.forward(200)
+        turtle.pendown()
+        turtle.circle(100)
+        turtle.left(2)
+        i += 1
+
+
 if __name__ == '__main__':
-    D = mat(ones((5, 1))/5)
+    # D = mat(ones((5, 1))/5)
     data_mat, label = load_dataset('horseColicTraining2.txt')
     # print(bulid_stump(data_mat, label, D))
     classifier, agg_class_est = adaboost_train(data_mat, label, 10)
-    plot_ROC(agg_class_est.T, label)
+    # plot_ROC(agg_class_est.T, label)
     # print(classifier)
-    # test_mat, test_label = load_dataset('horseColicTest2.txt')
-    # prediton = ada_classifier(test_mat, classifier)
-    # err_arr = mat(ones((67, 1)))
-    # error = err_arr[prediton != mat(test_label).T].sum()
-    # print(error)
+    test_mat, test_label = load_dataset('horseColicTest2.txt')
+    prediton = ada_classifier(test_mat, classifier)
+    err_arr = mat(ones((67, 1)))
+    error = err_arr[prediton != mat(test_label).T].sum()
+    print(error/67)
+    # plot_red_circle()
