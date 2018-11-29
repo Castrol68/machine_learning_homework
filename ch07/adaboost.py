@@ -212,7 +212,7 @@ if __name__ == '__main__':
     data_mat, label = load_dataset('horseColicTraining2.txt')
     # print(bulid_stump(data_mat, label, D))
     classifier, agg_class_est = adaboost_train(data_mat, label, 10)
-    # plot_ROC(agg_class_est.T, label)
+    plot_ROC(agg_class_est.T, label)
     # print(classifier)
     test_mat, test_label = load_dataset('horseColicTest2.txt')
     prediton = ada_classifier(test_mat, classifier)
