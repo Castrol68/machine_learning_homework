@@ -5,7 +5,7 @@
 @编译器：python3.7
 @Created on 2018-11-26 21:32
 @Author:ChileWang
-@algorithm：adaboot
+@algorithm：adaboost
 """
 from numpy import *
 import matplotlib.pyplot as plt
