@@ -1,0 +1,18 @@
+﻿google-chrome-stable --no-sandbox
+
+#从远程主机拿文件到本地  /home为本地文档
+scp hadoop@172.31.176.127:.ssh/id_rsa.pub /home/
+
+#将本地文件传送到远程主机 （只能传送到hadoop用户的hadoop文件夹，否则权限不够）
+scp authorized_keys hadoop@172.31.176.127:/home/hadoop/
+
+#goagent
+my-project-chile-219308
+
+mysql root登录
+mysql -uroot -p 
+psword:123456
+GRANT ALL PRIVILEGES ON *.* TO root@localhost IDENTIFIED BY "123456";
+GRANT ALL PRIVILEGES ON *.* TO root@"%" IDENTIFIED BY "123456";  # 允许这个用户远程登录
+GRANT ALL PRIVILEGES ON *.* TO chilewang@"%" IDENTIFIED BY "123456"; # 允许这个远程用户登录
+FLUSH PRIVILEGES; # 刷新权限
