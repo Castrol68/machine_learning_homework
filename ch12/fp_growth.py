@@ -187,3 +187,4 @@ if __name__ == '__main__':
     mine_tree(my_fp_tree, my_header_table, 100000, set([]), my_freq_list)
     print(len(my_freq_list))
     print(my_freq_list)
+    print('done')
